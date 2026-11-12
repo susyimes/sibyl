@@ -1,6 +1,6 @@
 # Sibyl Specification (SPEC.md)
 
-Status: Draft v0.3. The reference core passes the conformance cases; no agent has installed Sibyl yet.
+Status: Draft v0.4. The reference core passes the conformance cases; no agent has installed Sibyl yet.
 
 **Off means off.**
 - At L2, in a session where Sibyl is off, nothing reaches the model, nothing is shown, and nothing is written.
@@ -204,10 +204,17 @@ The cost of Sibyl is the extra reasoning the agent does in a kept-open turn, ins
 
 These are what the agent writes. The default body asks for them, and `delivered` detects them.
 
-- **Suggestions.** A line that begins with `Sibyl:` and a short heading in the user's language, which MUST NOT open with a quote mark. Then one to three numbered lines (`1. …`), likeliest first, each a message as the user would type it, in the user's language and voice.
+- **Suggestions.**
+  - A line that begins with `Sibyl:` and a short heading in the user's language. The heading MUST NOT open with a quote mark.
+  - Then one to three lines labelled `s1.`, `s2.`, `s3.`, likeliest first. Each holds a message as the user would type it, in the user's language and voice.
+  - Suggestions MUST NOT be labelled with bare numbers. Those stay free for the agent's own numbered options, so the two can appear together without confusion.
+  - When the agent's answer itself asks the user to choose between numbered options, the suggestions predict how the user will answer instead of repeating the options, for example `s1. Option 2, as you recommended · 0.55`.
+- **Confidence.** Every predicted message, in a suggestion or an acting line, ends with ` · ` and the agent's confidence: its honest probability that this is the message the user sends next, as a number from 0 to 1 with two decimals.
+  - The confidences need not add up to 1; the remainder stands for everything not listed.
+  - Sibyl sets no threshold. Whether to act stays the agent's judgement; the number makes that judgement visible.
 - **Cannot tell.** A single line `Sibyl:` followed by a short statement, not opening with a quote mark. It counts as delivered.
-- **Acting.** Before carrying on, a line that begins with `Sibyl:` followed by the predicted message in quote marks (`"…"`, `“…”` or `「…」`). It does not count as delivered.
-- **A reply that is only a number** refers to the suggestion with that number in the agent's previous message.
+- **Acting.** Before carrying on, a line that begins with `Sibyl:` followed by the predicted message in quote marks (`"…"`, `“…”` or `「…」`) and its confidence, for example `Sibyl: "Run the tests" · 0.85`. It does not count as delivered.
+- **Replies.** A reply `s2` (in either case) means suggestion 2, and any text after it adds to it, as in `s2 and update the README too`. A bare number keeps its usual meaning: the agent's own numbered options.
 
 ## 7. The `/predict` command
 
@@ -311,7 +318,9 @@ Do not leave a half-installed trigger behind.
 | `"parse": text or null` | read `PREDICT.md` text (§3) | `config` (all three settings, exactly); `notes` (how many); optional `body` (exact, after trimming) or `bodyStartsWith` |
 | `"delivered": text` | `delivered(text)` | `true` or `false` |
 
-A port passes when every case gives what `expect` says. `node conformance/run.mjs` runs the cases against the reference core. It also checks that the default template is the same in the core, in `./PREDICT.md` and in Appendix A.
+A port passes when every case gives what `expect` says. `node conformance/run.mjs` runs the cases against the reference core; that is the check an installation uses.
+
+In this repository, `node conformance/run.mjs --repo` also checks that the default template is the same in the core, in `./PREDICT.md` and in Appendix A. An installed copy MUST NOT depend on that check, because its `PREDICT.md` is the user's own and may differ.
 
 ---
 
@@ -329,8 +338,11 @@ Before you finish this turn, predict the message the user is most likely to send
 
 The first line above says whether you may act (`may_act=yes`) or must only suggest (`may_act=no`).
 
-- If you may act, and the next message is clear and only continues the current work (for example running the tests, or fixing a problem you just found): write one line `Sibyl: "<the message>"`, then carry on as if the user had sent it.
-- Otherwise, end the turn with the user's likely next messages: a line that starts with `Sibyl:` and a short heading in the user's language, then one to three numbered lines, likeliest first, each written as the user would type it, in their language and voice. The user may answer with just the number.
+- If you may act, and the next message is clear and only continues the current work (for example running the tests, or fixing a problem you just found): write one line `Sibyl: "<the message>" · <confidence>`, then carry on as if the user had sent it.
+- Otherwise, end the turn with the user's likely next messages: a line that starts with `Sibyl:` and a short heading in the user's language, then one to three lines labelled `s1.`, `s2.`, `s3.`, likeliest first, each written as the user would type it, in their language and voice. Never label them with bare numbers: those stay free for your own numbered options.
+- End every predicted message with ` · ` and your confidence: your honest probability that it is what the user sends next, as a number from 0 to 1 with two decimals (for example `s1. Run the tests · 0.70`). The confidences need not add up to 1: the rest is everything you did not list.
+- If your answer itself asks the user to choose between numbered options, do not repeat those options; predict how the user will answer, for example `s1. Option 2, as you recommended · 0.55`.
+- When the user replies `s2` (in either case), they mean that suggestion, and anything after it adds to it. A bare number refers to your own numbered options, as usual.
 - Only list, never act on, a message that would push, publish, deploy, delete, spend money, touch credentials, or choose a direction for the user.
 - Your prediction is a guess, not the user's consent: approvals and permissions apply as usual.
 - If you truly cannot tell what comes next, say so in one line after `Sibyl:` instead of inventing suggestions.

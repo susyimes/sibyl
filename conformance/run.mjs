@@ -1,6 +1,8 @@
-// Runs conformance/cases.jsonl against the reference core (SPEC.md §10), and checks that the default
-// PREDICT.md is the same in the core, in ./PREDICT.md and in SPEC.md Appendix A.
-//   node conformance/run.mjs
+// Runs conformance/cases.jsonl against the reference core (SPEC.md §10).
+//   node conformance/run.mjs          the cases only: what an installation checks
+//   node conformance/run.mjs --repo   also checks, in this repository, that the default PREDICT.md is the
+//                                     same in the core, in ./PREDICT.md and in SPEC.md Appendix A. An installed
+//                                     copy must not run this: its PREDICT.md is the user's own and may differ.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
@@ -62,15 +64,19 @@ for (const c of cases) {
   }
 }
 
-// The default template is written down three times; they must not drift apart.
+// In the repository, the default template is written down three times; they must not drift apart.
+const repo = process.argv.includes('--repo');
 const docs = [];
-if (read('PREDICT.md') !== DEFAULT_PREDICT) docs.push('PREDICT.md differs from the core\'s DEFAULT_PREDICT');
-const appendix = read('SPEC.md').split(/^## Appendix A\b.*$/m)[1]?.match(/```markdown\n([\s\S]*?)```/)?.[1];
-if (appendix !== DEFAULT_PREDICT) docs.push('SPEC.md Appendix A differs from the core\'s DEFAULT_PREDICT');
+if (repo) {
+  if (read('PREDICT.md') !== DEFAULT_PREDICT) docs.push('PREDICT.md differs from the core\'s DEFAULT_PREDICT');
+  const appendix = read('SPEC.md').split(/^## Appendix A\b.*$/m)[1]?.match(/```markdown\n([\s\S]*?)```/)?.[1];
+  if (appendix !== DEFAULT_PREDICT) docs.push('SPEC.md Appendix A differs from the core\'s DEFAULT_PREDICT');
+}
 
 for (const f of failures) console.log('FAIL ' + f);
 for (const d of docs) console.log('FAIL ' + d);
 const failed = new Set(failures.map((f) => f.split(':')[0])).size;
-console.log(`cases: ${cases.length - failed}/${cases.length} pass; default template: ${docs.length ? 'differs' : 'consistent'}`);
+console.log(`cases: ${cases.length - failed}/${cases.length} pass`
+  + (repo ? `; default template: ${docs.length ? 'differs' : 'consistent'}` : ''));
 console.log(failed || docs.length ? 'SIBYL CONFORMANCE: FAIL' : 'SIBYL CONFORMANCE: PASS');
 process.exitCode = failed || docs.length ? 1 : 0;

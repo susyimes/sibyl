@@ -14,14 +14,16 @@ Agent 每干完一轮，就站在你的角度想想你接下来最可能说什�
 
 ```
 Sibyl: 你可能想说
-1. 跑一下测试
-2. 顺便把 README 也更新一下
-3. 提交并推送到 main
+s1. 跑一下测试 · 0.60
+s2. 顺便把 README 也更新一下 · 0.20
+s3. 提交并推送到 main · 0.10
 ```
 
-回一个数字，就等于说了那句话。
+- **回 `s1`**，就等于说了那句话；后面还可以接着补充，比如 `s2 顺便把测试也跑了`。
+- **建议用 `s1`、`s2`、`s3` 编号**，不占用纯数字。Agent 自己的回答里列了 1、2、3 个方案时，你回纯数字 `2` 仍然是选它的方案 2，两套编号不会冲突。这种时候，Sibyl 会预测你会怎么选，比如 `s1. 选 2，按你推荐的来 · 0.55`，而不是把方案重复一遍。
+- **每条后面的数值是确定性**：Agent 认为你下一句就是这句的概率，取 0 到 1，保留两位小数。几条加起来不必凑满 1，差的部分就是「其他可能」。
 
-打开 `act` 模式后，像「跑一下测试」这种只是接着当前工作往下走的一步，它会自己接着做，默认最多连做 3 步。推送、发布、删除、花钱、碰凭据，或者需要你选方向的事，它只列出来，不替你做。
+打开 `act` 模式后，像「跑一下测试」这种只是接着当前工作往下走的一步，它会自己接着做，默认最多连做 3 步，并先写一行 `Sibyl: “跑一下测试” · 0.85` 说明它预测的是哪句、有多大把握。推送、发布、删除、花钱、碰凭据，或者需要你选方向的事，它只列出来，不替你做。
 
 ## 它怎么做到的
 
@@ -123,9 +125,9 @@ Sibyl 的前作是 [intent-predict](https://github.com/susyimes/intent-predict)�
 | [SPEC.md](SPEC.md) | 规范，写给安装 Sibyl 的 Agent。附录 A 是默认 `PREDICT.md` |
 | [PREDICT.md](PREDICT.md) | 默认的 `PREDICT.md` |
 | [reference/sibyl_core.mjs](reference/sibyl_core.mjs) | 参考核心：读 `PREDICT.md`、决定是否继续、识别 Agent 是否已经给出建议。只有纯函数，不读写文件，不联网，也不针对任何工具 |
-| [conformance/cases.jsonl](conformance/cases.jsonl) | 一致性用例（47 条），只是数据，跟实现语言无关 |
+| [conformance/cases.jsonl](conformance/cases.jsonl) | 一致性用例（49 条），只是数据，跟实现语言无关 |
 | [assets/sibyl.png](assets/sibyl.png) | 项目图（用 gpt-image-2.6 生成） |
-| [conformance/run.mjs](conformance/run.mjs) | 拿用例检验参考核心，并检查三处默认模板是否一致。用法：`node conformance/run.mjs`（Node ≥ 18，无依赖） |
+| [conformance/run.mjs](conformance/run.mjs) | 拿用例检验参考核心：`node conformance/run.mjs`，安装时用的就是它。加 `--repo` 时，还会检查仓库里三处默认模板是否一致。Node ≥ 18，无依赖 |
 
 ## 下一步
 

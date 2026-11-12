@@ -1,6 +1,6 @@
 # Sibyl Specification (SPEC.md)
 
-Status: Draft v0.4. The reference core passes the conformance cases; no agent has installed Sibyl yet.
+Status: Draft v0.4. The reference core passes the conformance cases. Grok CLI 1.0.77 installed Sibyl into itself from this file at L2 on 2026-11-12 and passed the acceptance in real turns.
 
 **Off means off.**
 - At L2, in a session where Sibyl is off, nothing reaches the model, nothing is shown, and nothing is written.
@@ -321,6 +321,20 @@ Do not leave a half-installed trigger behind.
 A port passes when every case gives what `expect` says. `node conformance/run.mjs` runs the cases against the reference core; that is the check an installation uses.
 
 In this repository, `node conformance/run.mjs --repo` also checks that the default template is the same in the core, in `./PREDICT.md` and in Appendix A. An installed copy MUST NOT depend on that check, because its `PREDICT.md` is the user's own and may differ.
+
+## 11. Optional modules
+
+A module extends an installation without changing this specification or the reference core.
+
+- Each module has its own specification, installation sentence, conformance cases, and acceptance.
+- A module is installed only on top of an installed base, and only by the user's choice.
+- It may add keys to `PREDICT.md`, which the base ignores, and forms to `/predict`.
+- Its changes go into the base's record, marked as the module's.
+- Disabling the base (`/predict disable`) takes its modules out too. Uninstalling a module leaves the base as it was.
+
+| Module | Specification | What it adds |
+|---|---|---|
+| Evolution | [evolve/SPEC.md](evolve/SPEC.md) | A local journal of the user's replies to predictions, statistics, and learning turns whose notes accompany later predictions |
 
 ---
 

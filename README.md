@@ -6,7 +6,9 @@
 
 > Sibyl（西比尔）是古希腊传说里的女预言者。
 
-> **现状**：规范、参考核心和一致性用例已经齐了，参考核心通过了全部用例；还没有任何 Agent 照规范给自己装过。
+> **现状**：
+> - **基础功能**：Grok CLI 已经照规范给自己装上，并在真实对话里通过了全部验收。
+> - **[进化模块](#进化模块可选)**：规范、参考核心和用例都有了，还没有 Agent 装过。
 
 ## 它做什么
 
@@ -103,6 +105,41 @@ max_auto_turns: 3     # act 模式下最多连做几步，到了就停下来列�
 （给 Agent 的说明：怎么预测、什么情况只列出不做……）
 ```
 
+## 进化模块（可选）
+
+让 Sibyl 越用越懂你：记下你对每次预测的反应，算出它猜得准不准，在你要求时让 Agent 研究这些记录、写下心得，之后每次预测都带上这些心得。
+
+它是单独安装的模块。基础功能装好之后，再对 Agent 说一句：
+
+> Add the Sibyl evolution module to your Sibyl installation according to https://github.com/susyimes/sibyl/blob/main/evolve/SPEC.md
+
+**记录什么**：每次 Sibyl 给出建议后，你的下一条消息会被归成四类之一：
+
+| 类型 | 例子 |
+|---|---|
+| 采纳 | `s1`，或者把某条建议原样打了出来 |
+| 采纳并补充 | `s2 顺便加上日志` |
+| Agent 自己的方案 | `2` |
+| 别的 | 你自己写的一句话（原样记下） |
+
+每条记录还包括当时的几条建议和各自的确定性、Agent 那段话的结尾，以及当时用的是哪一版心得。
+
+**新增的命令**
+
+| 命令 | 作用 |
+|---|---|
+| `/predict stats` | 查看统计，不经过模型：命中率、首选命中率，以及确定性和实际采纳率是否一致（比如说 0.6 的建议实际只被选了 35%），还有每一版心得各自的命中率 |
+| `/predict learn` | 让 Agent 研究记录，重写 `LEARNED.md`（命令在到达模型前就被拦下的环境，比如 Grok，会在你下一轮结束时进行） |
+| `/predict forget` | 删掉全部记录和心得 |
+
+**心得怎么起作用**：`LEARNED.md` 是写给 Agent 自己看的几条要点，比如「这个用户提交前总会先说跑测试」「你的确定性偏高」。之后每次请 Agent 预测时，都会附在说明后面，作为参考，不是规则。这个文件你可以随时看、改或删。
+
+**隐私和开关**
+- 记录会原样保存你说过的话，只存在本机的 `~/.sibyl/journal.jsonl` 里，不联网。
+- 会话关着时什么都不记。
+- `PREDICT.md` 里写 `journal: false` 就停止记录；`journal_max`（默认 2000）是最多保留的条数，超出时先删最旧的。
+- 学习只在你说 `/predict learn` 时进行，写文件时照常需要你批准。
+
 ## 为什么这样设计
 
 Sibyl 的前作是 [intent-predict](https://github.com/susyimes/intent-predict)，它从会话外面猜你的下一句。为此它需要：
@@ -126,14 +163,17 @@ Sibyl 的前作是 [intent-predict](https://github.com/susyimes/intent-predict)�
 | [PREDICT.md](PREDICT.md) | 默认的 `PREDICT.md` |
 | [reference/sibyl_core.mjs](reference/sibyl_core.mjs) | 参考核心：读 `PREDICT.md`、决定是否继续、识别 Agent 是否已经给出建议。只有纯函数，不读写文件，不联网，也不针对任何工具 |
 | [conformance/cases.jsonl](conformance/cases.jsonl) | 一致性用例（49 条），只是数据，跟实现语言无关 |
-| [assets/sibyl.png](assets/sibyl.png) | 项目图（用 gpt-image-2.6 生成） |
 | [conformance/run.mjs](conformance/run.mjs) | 拿用例检验参考核心：`node conformance/run.mjs`，安装时用的就是它。加 `--repo` 时，还会检查仓库里三处默认模板是否一致。Node ≥ 18，无依赖 |
+| [evolve/SPEC.md](evolve/SPEC.md) | 进化模块的规范。附录 A 是学习时交给 Agent 的说明 |
+| [evolve/learn_core.mjs](evolve/learn_core.mjs) | 进化模块的参考核心：解析建议、判断回复属于哪一类、生成记录、统计、附上心得。只有纯函数，不依赖基础核心 |
+| [evolve/cases.jsonl](evolve/cases.jsonl) · [evolve/run.mjs](evolve/run.mjs) | 进化模块的一致性用例（36 条）和运行器：`node evolve/run.mjs`，加 `--repo` 时还会核对附录 A |
+| [assets/sibyl.png](assets/sibyl.png) | 项目图（用 gpt-image-2.6 生成） |
 
 ## 下一步
 
-1. 先挑一个 Agent，照 [SPEC.md](SPEC.md) 给自己装上，走完两条验收。
-2. 再换一个架构不同的 Agent 试一次，比如云端的。两次安装里遇到的歧义，都改进规范。
-3. 用一段时间，看预测准不准、`act` 模式会不会自作主张，再决定要不要调整默认值。
+1. 给已经装了基础功能的 Grok 装上进化模块，走完它的验收。
+2. 再换一个架构不同的 Agent 试一次，比如云端的。安装时遇到的歧义，都拿来改进规范。
+3. 攒够记录以后看统计：预测准不准、确定性准不准、学习前后有没有变好，再决定要不要调整默认值，或者改成自动学习。
 
 ## 许可证
 

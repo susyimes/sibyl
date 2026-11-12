@@ -6,7 +6,7 @@
 
 /** The built-in PREDICT.md (SPEC.md Appendix A). */
 export const DEFAULT_PREDICT = `---
-default_on: false
+default_on: true
 mode: suggest
 max_auto_turns: 3
 ---
@@ -24,7 +24,7 @@ The first line above says whether you may act (\`may_act=yes\`) or must only sug
 - If you truly cannot tell what comes next, say so in one line after \`Sibyl:\` instead of inventing suggestions.
 `;
 
-const DEFAULTS = Object.freeze({ default_on: false, mode: 'suggest', max_auto_turns: 3 });
+const DEFAULTS = Object.freeze({ default_on: true, mode: 'suggest', max_auto_turns: 3 });
 /** A pending /predict request older than this is discarded without being applied (SPEC §7). */
 export const PENDING_TTL_MS = 120_000;
 /** A Sibyl line that does not open with a quote mark: suggestions, or "cannot tell" (SPEC §6). */

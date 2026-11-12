@@ -1,6 +1,6 @@
 # Sibyl Evolution Module (evolve/SPEC.md)
 
-Status: Draft v0.1. The reference core passes its conformance cases; no agent has installed the module yet.
+Status: Draft v0.2. The reference core passes its conformance cases. Grok CLI installed the module from this file on 2026-11-12 and passed the acceptance in real turns.
 
 Purpose: let Sibyl get better at predicting one particular user. The module adds three things to an installation:
 - it records, on the user's machine, which predictions the user took and what they said instead;
@@ -56,13 +56,16 @@ The module reads two keys from the `PREDICT.md` in effect (base §3), using `par
 | `journal` | `true` / `false` | `true` | Whether answered predictions are recorded. |
 | `journal_max` | integer ≥ 1 | `2000` | The most records kept; the oldest go first. |
 
-Files, kept next to the user-level `PREDICT.md` (locally `~/.sibyl/`):
+Files, kept in the shared home next to the user-level `PREDICT.md` (base §12; locally `~/.sibyl/`):
 - `journal.jsonl`: one record per line (§4).
-- `LEARNED.md`: the notes (§6). The agent writes them in learning turns; the user may edit or delete them at any time.
+- `LEARNED.md`: the notes (§6), a model of the user.
+
+Both are shared by every agent's installation on the machine. What one agent records and learns, the others use.
 
 Session state (base §4) gains two optional fields, which the base carries along untouched:
 - `last`: the suggestions waiting for the user's reply, as `{at, context, suggestions}`.
 - `learn`: `true` when a learning turn has been requested.
+- `answer`: the end of the agent's answer while its turn is kept open for a prediction (§5).
 
 ## 4. Recording
 
@@ -71,6 +74,7 @@ Session state (base §4) gains two optional fields, which the base carries along
 - the message;
 - the time;
 - the session id;
+- the agent's name, as in the registry (base §12);
 - a project key (locally, the first 12 hex digits of the SHA-256 of the working directory);
 - the version of `LEARNED.md` in effect (§6);
 - the `journal` setting.
@@ -87,7 +91,7 @@ It appends the returned record, if any, to `journal.jsonl`, and saves the state 
 A record:
 
 ```json
-{"at": 1800000000000, "session": "…", "project": "3f2a9c01b7de", "predictedAt": 1799999940000,
+{"at": 1800000000000, "session": "…", "agent": "grok", "project": "3f2a9c01b7de", "predictedAt": 1799999940000,
  "context": "the last 300 characters the agent wrote before its Sibyl block",
  "suggestions": [{"label": "s1", "text": "跑一下测试", "confidence": 0.6}],
  "reply": {"kind": "pick_plus", "label": "s1", "extra": "顺便加上日志", "text": "s1 顺便加上日志"},
@@ -126,12 +130,30 @@ on a genuine turn end:
   then save, delete pending requests and answer as the base does
 ```
 
-- `rememberPrediction` stores the delivered suggestions as `last`. It leaves an unsaved (off) result alone. A "cannot tell" line drops any older `last`.
+- `rememberPrediction` works at both kinds of turn end. It leaves an unsaved (off) result alone.
+  - When the turn is kept open for a prediction, it keeps the end of the agent's answer as `answer`. Where the prediction arrives as a message of its own, as in environments that feed the reason back as a new message, the answer is not in that message.
+  - When suggestions are delivered, it stores them as `last`. Their context is the text before the block, or else the stored `answer`.
+  - A "cannot tell" line drops any older `last`.
+- When a session is switched off, the integration SHOULD drop its `last` in the same write, so that an old prediction is not matched against a reply after the session is turned on again.
 - A learning turn does not count against the base's step budget. It does count against the environment's own limit on keeping a turn open.
 
-## 6. Learned notes
+## 6. Learned notes: the user model
 
-`LEARNED.md` is plain text. `appendLearned` places it after the prediction brief, under a fixed header (`LEARNED_HEADER`), and cuts it at 3000 characters. When the file is absent or empty, nothing is added.
+`LEARNED.md` is a model of the user that every agent on the machine reads before predicting.
+- `appendLearned` places it after the prediction brief, under a fixed header (`LEARNED_HEADER`), and cuts it at 3000 characters.
+- When the file is absent or empty, nothing is added.
+
+**Its shape: a fixed shell, with the content left to the model.** The learning brief (Appendix A) fixes only what keeps the model comparable, checkable and readable by any agent:
+- a first line `<!-- Sibyl LEARNED.md · v<n> · <date> · <records> records -->`;
+- evidence for each pattern as `(k/n)`, and nothing that fewer than 3 records support;
+- calibration numbers copied from the statistics, never estimated, and given per agent where agents differ;
+- at most 1500 characters after the first line, and no credentials, keys or personal identifiers.
+
+It also suggests five sections: Calibration, How this user writes, What usually comes next, What not to suggest, and Per project. The agent may add, merge, rename or drop them as the records call for.
+
+**Two owners, two files.**
+- `LEARNED.md` belongs to the learning turns, and any learning turn may rewrite it.
+- What the user wants every prediction to know for good, they write in their own `PREDICT.md`, which learning never touches.
 
 Its version is the first 12 hex digits of the SHA-256 of its text, or `null` when there is none. Every record stores the version that was in effect, so `stats` can compare hit rates before and after a round of learning.
 
@@ -143,7 +165,7 @@ The module adds three forms to `/predict` (base §7), handled like the base form
 
 | Form | Effect |
 |---|---|
-| `/predict stats` | Shows `formatStats(stats(records))`, without involving the model where the environment allows. |
+| `/predict stats` | Shows `formatStats(stats(records))`, without involving the model where the environment allows. The figures cover every agent, with hit rates split by agent and by version of the notes. |
 | `/predict learn` | Asks for a learning turn in the issuing session. |
 | `/predict forget` | Deletes `journal.jsonl` and `LEARNED.md`, and drops `last` from the stored session states. |
 
@@ -174,6 +196,7 @@ This section is addressed to the agent that adds the module.
    - The core: use `evolve/learn_core.mjs` as it is, or port it. It MUST pass every case in `evolve/cases.jsonl` (§10).
    - Extend the existing integration as in §4, §5 and §7.
    - Add `journal: true` and `journal_max: 2000` to the user-level `PREDICT.md` if the keys are absent.
+   - If `journal.jsonl` or `LEARNED.md` is already in the shared home, because another agent installed the module, reuse them as they are.
    - Record every change in the base's record, marked as the module's, with copies of the files as they were.
    - Merge, never replace, and stop for any approval the environment asks for, as the base requires.
 3. **Acceptance.** The module is installed only when the cases pass (`node evolve/run.mjs` prints `SIBYL EVOLVE CONFORMANCE: PASS`, or your port's runner does) and these are observed in real turns:
@@ -220,9 +243,21 @@ The reason of a learning turn is `[Sibyl] learn`, a blank line, and this text. `
 ```text
 The user asked Sibyl to learn from their recorded replies. Do this before you finish the turn, then end it as you normally would.
 
-1. Read the statistics below, and the journal at {journal}. Each line is one prediction: the suggestions with their confidences, a short excerpt of what came before, and what the user actually replied.
-2. Look for what would have made the predictions better: how this user phrases messages, what they tend to say after which kind of turn, which suggestions they never pick, what they add after picking one, and how your stated confidences compare with how often they were picked.
-3. Rewrite {learned} with what you found: at most 1500 characters of plain bullet points, written as advice to yourself for predicting this user. Keep what the records still support from the current notes, drop what they contradict, and quote the user only in short examples.
+1. Read the statistics below, and the journal at {journal}. Each line is one prediction: the suggestions with their confidences, a short excerpt of what came before, which agent made it, and what the user actually replied.
+2. Look for what would have made the predictions better: how this user phrases messages, what they tend to say after which kind of turn, which suggestions they never pick, what they add after picking one, and how stated confidences compare with how often they were picked.
+3. Rewrite {learned}. It is a model of this user that every agent on this machine reads before predicting, so write it for any agent, not only for yourself. Keep to these rules:
+   - Start with one line, `<!-- Sibyl LEARNED.md · v<n> · <date> · <records> records -->`, counting the version up from the current file.
+   - Copy calibration numbers exactly as the statistics give them; do not estimate your own. Where agents differ, give them per agent.
+   - Give each pattern its evidence as (k/n). Leave out patterns that fewer than 3 records support, or that the records now contradict.
+   - Write at most 1500 characters after the first line, quoting the user only in short examples. Include no credentials, keys or personal identifiers.
+   - Do not repeat what the user wrote in PREDICT.md: those notes are theirs, and they already reach every prediction.
+
+   These sections are a suggested shape, not a requirement; add, merge, rename or drop them as the records call for:
+   ## Calibration
+   ## How this user writes
+   ## What usually comes next
+   ## What not to suggest
+   ## Per project
 4. Tell the user in a few lines what you changed.
 
 Statistics:

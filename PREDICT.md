@@ -1,5 +1,5 @@
 ---
-default_on: false
+default_on: true
 mode: suggest
 max_auto_turns: 3
 ---

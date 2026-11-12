@@ -7,9 +7,21 @@
 /** The brief for a learning turn (evolve/SPEC.md Appendix A). {journal}, {learned} and {stats} are filled in. */
 export const LEARN_BRIEF = `The user asked Sibyl to learn from their recorded replies. Do this before you finish the turn, then end it as you normally would.
 
-1. Read the statistics below, and the journal at {journal}. Each line is one prediction: the suggestions with their confidences, a short excerpt of what came before, and what the user actually replied.
-2. Look for what would have made the predictions better: how this user phrases messages, what they tend to say after which kind of turn, which suggestions they never pick, what they add after picking one, and how your stated confidences compare with how often they were picked.
-3. Rewrite {learned} with what you found: at most 1500 characters of plain bullet points, written as advice to yourself for predicting this user. Keep what the records still support from the current notes, drop what they contradict, and quote the user only in short examples.
+1. Read the statistics below, and the journal at {journal}. Each line is one prediction: the suggestions with their confidences, a short excerpt of what came before, which agent made it, and what the user actually replied.
+2. Look for what would have made the predictions better: how this user phrases messages, what they tend to say after which kind of turn, which suggestions they never pick, what they add after picking one, and how stated confidences compare with how often they were picked.
+3. Rewrite {learned}. It is a model of this user that every agent on this machine reads before predicting, so write it for any agent, not only for yourself. Keep to these rules:
+   - Start with one line, \`<!-- Sibyl LEARNED.md · v<n> · <date> · <records> records -->\`, counting the version up from the current file.
+   - Copy calibration numbers exactly as the statistics give them; do not estimate your own. Where agents differ, give them per agent.
+   - Give each pattern its evidence as (k/n). Leave out patterns that fewer than 3 records support, or that the records now contradict.
+   - Write at most 1500 characters after the first line, quoting the user only in short examples. Include no credentials, keys or personal identifiers.
+   - Do not repeat what the user wrote in PREDICT.md: those notes are theirs, and they already reach every prediction.
+
+   These sections are a suggested shape, not a requirement; add, merge, rename or drop them as the records call for:
+   ## Calibration
+   ## How this user writes
+   ## What usually comes next
+   ## What not to suggest
+   ## Per project
 4. Tell the user in a few lines what you changed.
 
 Statistics:
@@ -112,27 +124,38 @@ export function classifyReply(prompt, suggestions) {
 }
 
 /**
- * At a turn end, after the base decide() (evolve/SPEC.md §5): remember the suggestions the agent delivered,
- * so that the user's reply can be matched against them. Leaves an unsaved (off) result untouched.
+ * At a turn end, after the base decide() (evolve/SPEC.md §5).
+ * - When the turn is kept open for a prediction, keep the end of the agent's answer as `answer`: where the
+ *   prediction arrives as a message of its own, the answer is not in that message.
+ * - When the agent has delivered suggestions, remember them as `last`, with the answer as context, so that
+ *   the user's reply can be matched against them.
+ * Leaves an unsaved (off) result untouched.
  */
 export function rememberPrediction({ result, finalText, now }) {
-  if (!result || !result.save || result.decision !== 'allow') return result;
+  if (!result || !result.save) return result;
+  if (result.decision === 'keep_open') {
+    const answer = cutEnd(String(finalText ?? '').trim(), CONTEXT_MAX);
+    if (!answer) return result;
+    return { ...result, state: { ...result.state, answer } };
+  }
+  if (result.decision !== 'allow') return result;
   const parsed = parseSuggestions(finalText);
   if (!parsed) return result;
   const state = { ...result.state };
   if (parsed.suggestions.length) {
     const lines = String(finalText).replace(/\r\n?/g, '\n').split('\n');
     const at = lines.findLastIndex((l) => HEADING_RE.test(l.replace(/\*\*/g, '')));
-    const context = cutEnd(lines.slice(0, at).join('\n').trim(), CONTEXT_MAX);
-    state.last = { at: now, context, suggestions: parsed.suggestions };
+    const before = cutEnd(lines.slice(0, at).join('\n').trim(), CONTEXT_MAX);
+    state.last = { at: now, context: before || state.answer || '', suggestions: parsed.suggestions };
   } else {
     delete state.last;                                   // "cannot tell": nothing to match a reply against
   }
+  delete state.answer;
   return { ...result, state };
 }
 
 /** At the user's next message (evolve/SPEC.md §4): one journal record, or none. */
-export function recordReply({ state, prompt, now, session = null, project = null, learned = null, journal = true }) {
+export function recordReply({ state, prompt, now, session = null, agent = null, project = null, learned = null, journal = true }) {
   const none = { record: null, save: false, state };
   if (!state || !state.last || !state.on) return none;   // off means off
   if (COMMAND_RE.test(String(prompt ?? ''))) return none;
@@ -143,6 +166,7 @@ export function recordReply({ state, prompt, now, session = null, project = null
   const record = {
     at: now,
     session,
+    agent,
     project,
     predictedAt: state.last.at,
     context: state.last.context,
@@ -192,11 +216,13 @@ export function stats(records) {
   let brierSum = 0;
   let brierN = 0;
   const byLearned = {};
+  const byAgent = {};
   for (const r of usable) {
-    const key = r.learned ?? 'none';
-    byLearned[key] ??= { records: 0, hits: 0 };
-    byLearned[key].records += 1;
-    if (hit(r)) byLearned[key].hits += 1;
+    for (const [group, key] of [[byLearned, r.learned ?? 'none'], [byAgent, r.agent ?? 'unknown']]) {
+      group[key] ??= { records: 0, hits: 0 };
+      group[key].records += 1;
+      if (hit(r)) group[key].hits += 1;
+    }
     for (const s of r.suggestions) {
       if (typeof s.confidence !== 'number') continue;
       const outcome = hit(r, s.label) ? 1 : 0;
@@ -223,6 +249,7 @@ export function stats(records) {
     })),
     brier: ratio(brierSum, brierN),
     byLearned,
+    byAgent,
   };
 }
 
@@ -239,7 +266,9 @@ export function formatStats(s) {
     for (const b of s.calibration) lines.push(`  ${b.from.toFixed(1)}-${b.to.toFixed(1)}: ${b.n} suggestions, stated ${b.stated}, picked ${b.picked}`);
     lines.push(`Brier score ${s.brier} (lower is better)`);
   }
-  const versions = Object.entries(s.byLearned);
-  if (versions.length > 1) lines.push('hit rate by notes version: ' + versions.map(([k, v]) => `${k} ${v.hits}/${v.records}`).join(', '));
+  for (const [label, group] of [['notes version', s.byLearned], ['agent', s.byAgent]]) {
+    const entries = Object.entries(group);
+    if (entries.length > 1) lines.push(`hit rate by ${label}: ` + entries.map(([k, v]) => `${k} ${v.hits}/${v.records}`).join(', '));
+  }
   return lines.join('\n');
 }

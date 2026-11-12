@@ -41,6 +41,10 @@ const kinds = {
       same(c.id, 'state.last', got.state?.last, c.expect.last);
     }
     if ('save' in c.expect) same(c.id, 'save', got.save, c.expect.save);
+    if ('answer' in c.expect) {
+      if (c.expect.answer === null) { if (got.state && 'answer' in got.state) fail(c.id, 'state.answer should be absent'); }
+      else same(c.id, 'state.answer', got.state?.answer, c.expect.answer);
+    }
   },
   record(c) {
     const got = recordReply(c.record);

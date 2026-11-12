@@ -8,7 +8,7 @@
 
 > **现状**：
 > - **基础功能**：Grok CLI 已经照规范给自己装上，并在真实对话里通过了全部验收。
-> - **[进化模块](#进化模块可选)**：规范、参考核心和用例都有了，还没有 Agent 装过。
+> - **[进化模块](#进化模块可选)**：Grok CLI 也已经照规范装上，并在真实对话里通过了全部验收。
 
 ## 它做什么
 
@@ -77,10 +77,14 @@ s3. 提交并推送到 main · 0.10
 | `/predict on act` | 开启，并允许它自己接着做明显的下一步 |
 | `/predict off` | 在当前会话关闭 |
 | `/predict status` | 查看档位、生效的 `PREDICT.md` 和开着的会话 |
-| `/predict disable` | 全局停用：把 Sibyl 从 Agent 的配置里整个撤出去 |
-| `/predict uninstall` | 停用，并删掉 Sibyl 自己的文件 |
+| `/predict disable` | 在这个 Agent 上全局停用：把 Sibyl 从它的配置里整个撤出去，不影响别的 Agent |
+| `/predict uninstall` | 停用，并删掉这个 Agent 的安装文件；你的设置和记录这类共用文件会保留 |
 
-Sibyl 默认关闭。`on` / `off` 只影响你输入命令的那个会话。
+**装好后默认开启，用 suggest 模式。** 以后每个由你直接操作的会话，结尾都会出建议，不用再输入 `/predict on`。`act` 模式只有你自己要求才会开。
+- **由脚本或别的程序启动的会话默认关闭**，比如一次性的 `grok -p` 调用：没人会回它的建议，多出一段内容还可能弄坏读取输出的程序。
+- **想让某个脚本完全不受影响**：给它设上环境变量 `SIBYL=off`。
+- **想改回默认关闭**：在 `PREDICT.md` 里写 `default_on: false`。
+- **只关某一个会话**：`/predict off`。`on` / `off` 只影响你输入命令的那个会话。
 
 **关闭时完全不起作用**，分两档：
 
@@ -94,16 +98,43 @@ Sibyl 按以下顺序取第一个存在的：
 2. 用户级的 `PREDICT.md`；
 3. 内置默认，也就是 [PREDICT.md](PREDICT.md) 这份。
 
-改完下一轮就生效。
+改完下一轮就生效。想让每次预测都知道、又不想被学习改掉的事，比如「我说『推』就是推到 main」，写在这份文件的正文里。
 
 ```markdown
 ---
-default_on: false     # 新会话是否默认开启
+default_on: true      # 由你直接操作的新会话是否默认开启（脚本启动的会话总是关闭）
 mode: suggest         # suggest：只列出 | act：明显的下一步可以自己接着做
 max_auto_turns: 3     # act 模式下最多连做几步，到了就停下来列出建议
 ---
 （给 Agent 的说明：怎么预测、什么情况只列出不做……）
 ```
+
+## 多个 Agent 共用 `~/.sibyl`
+
+同一台机器上，你给几个 Agent 装 Sibyl，它们就共用同一个目录，你的设置、各会话的开关、记录和用户模型都会跟着你换 Agent：
+
+```
+~/.sibyl/
+  sibyl.json           登记了哪些 Agent 装了 Sibyl
+  PREDICT.md           你的设置和长期备注                  共用
+  sessions/            各会话的开关和计数                  共用
+  journal.jsonl        进化模块的记录                      共用
+  LEARNED.md           进化模块学到的用户模型              共用
+  agents/<名字>/       某一个 Agent 自己的安装：接入代码、核心副本、改动记录
+```
+
+**安装时目录已经存在，分四种情况处理：**
+
+| 情况 | 处理 |
+|---|---|
+| 有 `sibyl.json` | 别的 Agent 已经装过。把自己登记进去，你的设置和记录原样沿用；如果自己装过，就改为重新启用或升级 |
+| 有 Sibyl 的文件，但没有 `sibyl.json`（早先的安装把文件放在了根目录） | 补写 `sibyl.json`，把早先的安装登记成「就在原处」。不搬动它的文件，因为它的登记指向那里；装完告诉你 |
+| 是个不相干的同名目录 | 一个字都不动，停下来问你换个位置 |
+| 你的 `PREDICT.md` 和当前默认版本不同 | 保留你的。如果当前默认版本里有你缺的重要内容（比如新的输出格式），告诉你，由你决定要不要加 |
+
+还有一种情况要防：有的工具会顺带执行别家工具配置里的 hook（比如 Grok 会读 Claude Code 的设置）。两家都装时，同一轮可能被拦下两次，所以安装的 Agent 要先检查，不重复登记。
+
+停用和卸载只影响执行命令的那个 Agent；只要还有别的 Agent 在用，共用的文件就都保留。
 
 ## 进化模块（可选）
 
@@ -132,7 +163,16 @@ max_auto_turns: 3     # act 模式下最多连做几步，到了就停下来列�
 | `/predict learn` | 让 Agent 研究记录，重写 `LEARNED.md`（命令在到达模型前就被拦下的环境，比如 Grok，会在你下一轮结束时进行） |
 | `/predict forget` | 删掉全部记录和心得 |
 
-**心得怎么起作用**：`LEARNED.md` 是写给 Agent 自己看的几条要点，比如「这个用户提交前总会先说跑测试」「你的确定性偏高」。之后每次请 Agent 预测时，都会附在说明后面，作为参考，不是规则。这个文件你可以随时看、改或删。
+**心得就是你的用户模型**：`LEARNED.md` 是几条关于你的要点，比如「这个用户提交前总会先说跑测试 (22/30)」「确定性 0.6–0.8 的建议实际只被选了 35%」。之后每次请 Agent 预测时，都会附在说明后面，作为参考，不是规则。
+- **外壳固定，内容交给模型**。固定的只有四样：
+  - 开头一行，写明第几版、日期、基于多少条记录；
+  - 每条规律带上证据次数，少于 3 次的不写；
+  - 校准数字照抄统计结果，不让模型自己估；
+  - 不超过 1500 字，不写凭据和个人身份信息。
+
+  分哪几节、写什么，由模型根据记录自己决定。学习说明里只是建议了几节：校准、你怎么说话、通常接下来说什么、什么不该建议、各项目的特点。
+- **心得和你的设置分开**：`LEARNED.md` 归学习管，每次学习都可能重写，你也可以随时看、改或删；想永久保留的事写进你自己的 `PREDICT.md`，学习不会碰它。
+- **所有 Agent 共用这一份**：Grok 学到的，Claude Code 预测时也会用上。统计会按 Agent 分开算，因为不同模型的确定性准不准，可能差别很大。
 
 **隐私和开关**
 - 记录会原样保存你说过的话，只存在本机的 `~/.sibyl/journal.jsonl` 里，不联网。
@@ -151,7 +191,7 @@ Sibyl 的前作是 [intent-predict](https://github.com/susyimes/intent-predict)�
 
 设计遵循 [AGENT.md](https://github.com/susyimes/agent-coding-principle/blob/main/AGENT.md) 的原则：
 - 不限制模型的判断，预测什么由 Agent 决定；
-- 规则少而松，只保留保护你的几条：默认关闭；预测不等于你的同意；有外部影响的只列不做；自己接着做有步数上限；出错就正常结束；
+- 规则少而松，只保留保护你的几条：只有你决定安装才会出现；随时能关、关了就完全不起作用；预测不等于你的同意；有外部影响的只列不做；自己接着做有步数上限；出错就正常结束；
 - 限制都是显式的，可以关掉；
 - 风险摆出来给你看，不藏起来。
 
@@ -162,11 +202,11 @@ Sibyl 的前作是 [intent-predict](https://github.com/susyimes/intent-predict)�
 | [SPEC.md](SPEC.md) | 规范，写给安装 Sibyl 的 Agent。附录 A 是默认 `PREDICT.md` |
 | [PREDICT.md](PREDICT.md) | 默认的 `PREDICT.md` |
 | [reference/sibyl_core.mjs](reference/sibyl_core.mjs) | 参考核心：读 `PREDICT.md`、决定是否继续、识别 Agent 是否已经给出建议。只有纯函数，不读写文件，不联网，也不针对任何工具 |
-| [conformance/cases.jsonl](conformance/cases.jsonl) | 一致性用例（49 条），只是数据，跟实现语言无关 |
+| [conformance/cases.jsonl](conformance/cases.jsonl) | 一致性用例（50 条），只是数据，跟实现语言无关 |
 | [conformance/run.mjs](conformance/run.mjs) | 拿用例检验参考核心：`node conformance/run.mjs`，安装时用的就是它。加 `--repo` 时，还会检查仓库里三处默认模板是否一致。Node ≥ 18，无依赖 |
 | [evolve/SPEC.md](evolve/SPEC.md) | 进化模块的规范。附录 A 是学习时交给 Agent 的说明 |
 | [evolve/learn_core.mjs](evolve/learn_core.mjs) | 进化模块的参考核心：解析建议、判断回复属于哪一类、生成记录、统计、附上心得。只有纯函数，不依赖基础核心 |
-| [evolve/cases.jsonl](evolve/cases.jsonl) · [evolve/run.mjs](evolve/run.mjs) | 进化模块的一致性用例（36 条）和运行器：`node evolve/run.mjs`，加 `--repo` 时还会核对附录 A |
+| [evolve/cases.jsonl](evolve/cases.jsonl) · [evolve/run.mjs](evolve/run.mjs) | 进化模块的一致性用例（37 条）和运行器：`node evolve/run.mjs`，加 `--repo` 时还会核对附录 A |
 | [assets/sibyl.png](assets/sibyl.png) | 项目图（用 gpt-image-2.6 生成） |
 
 ## 下一步

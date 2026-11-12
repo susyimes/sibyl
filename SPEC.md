@@ -1,6 +1,6 @@
 # Sibyl Specification (SPEC.md)
 
-Status: Draft v0.4. The reference core passes the conformance cases. Grok CLI 1.0.77 installed Sibyl into itself from this file at L2 on 2026-11-12 and passed the acceptance in real turns.
+Status: Draft v0.5. The reference core passes the conformance cases. Grok CLI 1.0.77 installed Sibyl into itself from this file at L2 on 2026-11-12 and passed the acceptance in real turns.
 
 **Off means off.**
 - At L2, in a session where Sibyl is off, nothing reaches the model, nothing is shown, and nothing is written.
@@ -108,7 +108,7 @@ The file SHOULD be read again at every turn end, so that edits take effect at on
 
 | Key | Values | Default | Meaning |
 |---|---|---|---|
-| `default_on` | `true` / `false` | `false` | Whether a session that has not used `/predict` starts with Sibyl on. |
+| `default_on` | `true` / `false` | `true` | Whether an interactive session that has not used `/predict` starts with Sibyl on. Sessions started non-interactively start off whatever this says (§5.3). |
 | `mode` | `suggest` / `act` | `suggest` | `suggest` only lists predictions. `act` may also carry on by itself. |
 | `max_auto_turns` | integer ≥ 0 | `3` | In `act` mode, the most steps taken by itself in a row before it must stop and list suggestions. |
 
@@ -191,7 +191,9 @@ decide(input):
 
 ### 5.3 What the integration does
 
-1. **Fast path.** Load the pending request (§7) and the session's state first. If there is no pending request and the session is off, let the turn end at once. A session never seen before is off unless `PREDICT.md` says `default_on: true`. On the fast path, read nothing else (no transcript), write nothing, and output nothing.
+1. **Fast path.** Load the pending request (§7) and the session's state first. If there is no pending request and the session is off, let the turn end at once. On the fast path, read nothing else (no transcript), write nothing, and output nothing.
+   - A session never seen before starts as `default_on` says, with one exception. A session that the environment can tell was started non-interactively (a one-shot run, a script, another program driving the agent) starts off. Nobody is there to answer its suggestions, and an extra block could break a program that reads the output. The integration SHOULD detect this where the environment allows; `/predict on` still turns such a session on.
+   - With the environment variable `SIBYL=off` set for the agent, the trigger MUST always take the fast path. Scripts and programs that drive an agent use it to keep Sibyl out of their runs.
 2. Otherwise, map the environment's turn-end event to `decide`'s input. Read `finalText` from the event if it carries it, otherwise from the session's transcript; if neither is possible, pass it empty. Load the `PREDICT.md` text (C3).
 3. Call `decide`. Write the returned state only when `save` is true. Delete the pending request if it was `claimed` or `discarded`. Do this before answering.
 4. On `allow`, let the turn end. On `keep_open`, keep the agent working with `reason` as what it receives next.
@@ -223,8 +225,8 @@ These are what the agent writes. The default body asks for them, and `delivered`
 | `/predict on [suggest\|act]` | Turns Sibyl on for the session the command was typed in. With a mode, the session uses that mode; without one, it follows `PREDICT.md`. |
 | `/predict off` | Turns it off for that session. |
 | `/predict status` | Shows the level, which `PREDICT.md` is in effect and its settings, and what is known about the sessions that are on. |
-| `/predict disable` | Takes Sibyl out of the agent's configuration everywhere: removes every registration it made (the turn-end trigger, the command, and at L1 the instruction paragraph). Sibyl's own files and the record of changes stay where they are, unused. |
-| `/predict uninstall` | Disables Sibyl, then also deletes its own files (§9.4). |
+| `/predict disable` | Takes Sibyl out of this agent's configuration everywhere: removes every registration it made (the turn-end trigger, the command, and at L1 the instruction paragraph). This installation's files and record stay where they are, unused. Other agents' installations are not affected (§12). |
+| `/predict uninstall` | Disables Sibyl for this agent, then deletes this installation's files (§9.4). Shared files stay (§12). |
 
 - `on` and `off` MUST affect only the issuing session. They switch predictions, not the installation: with `off`, the trigger still runs its fast path (§5.3).
 - `disable` MUST leave the agent's configuration exactly as it was before installation, apart from changes others made since.
@@ -238,7 +240,8 @@ At L1, the agent follows these commands in the conversation itself.
 
 ## 8. Safety
 
-- Sibyl is off unless the user turns it on, per session or with `default_on`.
+- Installing Sibyl is the user's choice. Once installed, it starts on in `suggest` mode in interactive sessions; `act` is never on unless the user asks for it.
+- `/predict off` per session, `default_on: false`, and `SIBYL=off` each turn it off. A non-interactive session starts off (§5.3).
 - Off means off:
   - At L2, an off session gets nothing in its context, no output and no writes (§5.3).
   - At either level, `disable` removes Sibyl from the configuration entirely (§7).
@@ -263,6 +266,8 @@ Work out what your environment offers for C1–C4 (§2.1), and any limit on keep
 3. **The command** (§7).
 4. **The default `PREDICT.md`** (Appendix A) at the user level, unless one is already there.
 
+Put the files where §12 says: what concerns the user goes in the shared home; this installation's own files go under a folder of their own. When the home already exists, follow §12 before changing anything.
+
 While building:
 - Merge into existing configuration; never replace or reorder what is already there.
 - Keep a record of every change you make, with how to undo it, and a copy of each file as it was before you changed it. Keep the record with Sibyl's own files: `disable`, re-enabling and `uninstall` all work from it.
@@ -280,7 +285,8 @@ Sibyl is installed only when all of these hold:
    - with Sibyl off, a turn ends normally, nothing of Sibyl's appears in it, and the state store is left unchanged;
    - after `/predict on`, the next turn ends with a `Sibyl:` block of numbered suggestions;
    - a new user message starts the count again, so that turn is also kept open once;
-   - with the state store made unavailable, a turn still ends normally (fail open), and works again once the store is restored.
+   - with the state store made unavailable, a turn still ends normally (fail open), and works again once the store is restored;
+   - with `SIBYL=off` set, a turn in a session that would otherwise be on ends with nothing of Sibyl's in it and nothing written.
 3. **Disable and re-enable.**
    - After `/predict disable`, every configuration file Sibyl changed is identical to its pre-installation copy, apart from changes others made since.
    - A turn then behaves as it did before installation.
@@ -294,8 +300,8 @@ At L1, item 2 is reduced to the `/predict on` check and is best effort; item 3 a
 - the level reached;
 - what you used for C1–C4, and what you changed;
 - the acceptance results;
-- that Sibyl is off until they turn it on;
-- how to turn it on and off per session, and how to disable it everywhere and bring it back;
+- that Sibyl is now on in `suggest` mode for new interactive sessions, and off in non-interactive ones;
+- how to turn it off and on per session, how to keep it off by default (`default_on: false`) or out of a script (`SIBYL=off`), and how to disable it everywhere and bring it back;
 - where the record of changes is kept, and how to uninstall.
 
 **On failure:**
@@ -306,7 +312,7 @@ At L1, item 2 is reduced to the `/predict on` check and is best effort; item 3 a
 
 Do not leave a half-installed trigger behind.
 
-**Uninstall** disables Sibyl (§7), then deletes its own files and the record. It keeps the user-level `PREDICT.md` unless the user asks for it to be deleted.
+**Uninstall** disables Sibyl for this agent (§7), then deletes this installation's own files and record, and removes it from the registry (§12). Shared files stay while any other installation remains. When the last installation goes, the user-level `PREDICT.md` and any module data are kept unless the user asks for them to be deleted.
 
 ## 10. Conformance cases
 
@@ -336,6 +342,42 @@ A module extends an installation without changing this specification or the refe
 |---|---|---|
 | Evolution | [evolve/SPEC.md](evolve/SPEC.md) | A local journal of the user's replies to predictions, statistics, and learning turns whose notes accompany later predictions |
 
+## 12. The shared home
+
+Sibyl's files are about a user, not about one agent. Every installation for the same user on the same machine SHOULD share one home, locally `~/.sibyl/`. The user's settings, session switches and, with the evolution module, their journal and learned notes then follow them from agent to agent.
+
+```
+~/.sibyl/
+  sibyl.json             the registry: {"layout": 1, "agents": {"<agent>": {"dir": "agents/<agent>", "level": "L2", "enabled": true}}}
+  PREDICT.md             the user's settings and notes                         shared
+  sessions/<id>.json     session states (agents' session ids do not collide)  shared
+  journal.jsonl          the evolution module's journal                       shared
+  LEARNED.md             the evolution module's notes                         shared
+  agents/<agent>/        one installation: its integration, its copies of the cores, its record, its log
+```
+
+**Shared files belong to the user.**
+- An installer MUST NOT overwrite or delete them, except as §9.4 allows.
+- When an installation rewrites a session state, it MUST keep fields it does not know; other installations and modules may have put them there.
+- Writes SHOULD be atomic: write a temporary file, then rename it. A journal record SHOULD be appended in a single write.
+
+**Each installation keeps to its own folder.** Its integration, its copies of the cores and its record live under `agents/<agent>/`. One agent upgrading its copies then cannot change another agent's behaviour.
+
+**When the home already exists**, the installer looks before changing anything:
+
+| What is there | What to do |
+|---|---|
+| A `sibyl.json` | A Sibyl home. Add yourself to the registry and reuse the shared files as they are. If you are already registered, re-enable or upgrade your own folder instead of installing again. |
+| Sibyl's files but no `sibyl.json`: an earlier installation that kept its files at the top level | Still a Sibyl home. Write `sibyl.json`, registering the earlier installation where it is (`"dir": "."`). Do not move its files, because its registrations point at them. Tell the user. |
+| Anything else: a folder Sibyl did not make | Do not touch it. Stop and ask the user for another location, or report that you could not install. |
+| A user-level `PREDICT.md` that differs from the current default | Keep it. If the current default has something it lacks that matters, such as a newer output convention, tell the user and let them decide. |
+
+**Two installations, one trigger.** Some environments also run triggers registered for another tool. For example, an agent may read another tool's settings file. If your environment would also run an existing installation's trigger, do not register a second one there; say how you resolved it.
+
+**Removing.**
+- `disable` and `uninstall` act on the issuing agent's installation only: its registrations and its folder. They also update the registry.
+- `/predict status` SHOULD list every installation in the registry.
+
 ---
 
 ## Appendix A. Default `PREDICT.md`
@@ -344,7 +386,7 @@ This is the built-in default (§3) and the file the installer places at the user
 
 ```markdown
 ---
-default_on: false
+default_on: true
 mode: suggest
 max_auto_turns: 3
 ---

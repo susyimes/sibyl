@@ -207,7 +207,7 @@ Sibyl 的前作是 [intent-predict](https://github.com/susyimes/intent-predict)�
 | [evolve/SPEC.md](evolve/SPEC.md) | 进化模块的规范。附录 A 是学习时交给 Agent 的说明 |
 | [evolve/learn_core.mjs](evolve/learn_core.mjs) | 进化模块的参考核心：解析建议、判断回复属于哪一类、生成记录、统计、附上心得。只有纯函数，不依赖基础核心 |
 | [evolve/cases.jsonl](evolve/cases.jsonl) · [evolve/run.mjs](evolve/run.mjs) | 进化模块的一致性用例（37 条）和运行器：`node evolve/run.mjs`，加 `--repo` 时还会核对附录 A |
-| [proposals/](proposals/) | 待讨论的方案，不是规范。定下来后才会写进规范。目前有：L1.5（由 Agent 自己当触发器） |
+| [proposals/](proposals/) | 待讨论的方案，不是规范。定下来后才会写进规范。目前有：L1.5（由 Agent 自己当触发器）、用户模型分层与每个会话只完整送一次说明 |
 | [assets/sibyl.png](assets/sibyl.png) | 项目图（用 gpt-image-2.6 生成） |
 
 ## 下一步

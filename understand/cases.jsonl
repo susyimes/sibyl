@@ -1,0 +1,34 @@
+{"id":"M1","parse":"Sibyl 理解\n\n前文约定手机竖屏。\n\ns1. 拖轮\n\ns2. 渔船归港\n\ns3. 渡船","expect":{"context":"前文约定手机竖屏。","choices":[{"label":"s1","text":"拖轮"},{"label":"s2","text":"渔船归港"},{"label":"s3","text":"渡船"}]}}
+{"id":"M2","parse":"**Sibyl 理解**\r\n\r\n- **s1. 拖轮** 展示\r\n\r\n- **s2.** 渔船\r\n靠岸\r\n\r\n- s3、 **渡船**","expect":{"context":"","choices":[{"label":"s1","text":"拖轮 展示"},{"label":"s2","text":"渔船\n靠岸"},{"label":"s3","text":"**渡船**"}]}}
+{"id":"M3","parse":"Sibyl Understand\n\n? Which reference image?","expect":{"question":"Which reference image?"}}
+{"id":"M4","parse":"Sibyl: 你可能想说\ns1. a\ns2. b\ns3. c","expect":null}
+{"id":"M5","parse":"Sibyl 理解\ns1. a\ns3. c","expect":null}
+{"id":"M6","parse":"Sibyl 理解\ns1. a\ns2. a\ns3. c","expect":null}
+{"id":"M7","parse":"Sibyl 理解\ns1. a\ns2. b\ns3. c\n\nSibyl: next","expect":null}
+{"id":"M8","parse":"Sibyl 理解\ns1. a\ns2. b\ns3. c\n\npick one","expect":null}
+{"id":"M9","parse":"```\nSibyl 理解\ns1. a\ns2. b\ns3. c\n```","expect":null}
+{"id":"M10","parse":"Sibyl 理解\ns1. a\ns2. b\ns2. c\ns3. d","expect":null}
+{"id":"M11","parse":"Sibyl 理解\ns1. a\ns2. b\ns3. c\ns4. d","expect":null}
+{"id":"M12","parse":"Sibyl 理解\ns1. a\ns2. b\ns3. c\n```\nfoo\n```","expect":null}
+{"id":"M13","parse":"Sibyl 理解\n\ns1. 请做一艘港口拖轮。\n\n保持既有的竖屏镜头，检查船体轮廓。\n\ns2. 请做一艘模型用渔船。\n\n导入编辑器验证尺度。\n\ns3. 请做一艘渡轮。\n\n交付可编辑的原始模型。","expect":{"context":"","choices":[{"label":"s1","text":"请做一艘港口拖轮。\n\n保持既有的竖屏镜头，检查船体轮廓。"},{"label":"s2","text":"请做一艘模型用渔船。\n\n导入编辑器验证尺度。"},{"label":"s3","text":"请做一艘渡轮。\n\n交付可编辑的原始模型。"}]}}
+{"id":"M14","parse":"Sibyl 理解\n\n**s1.**\n\n请制作港口拖轮。\n\ns2.\n制作船模。\n\ns3. 制作渡轮。","expect":{"context":"","choices":[{"label":"s1","text":"请制作港口拖轮。"},{"label":"s2","text":"制作船模。"},{"label":"s3","text":"制作渡轮。"}]}}
+{"id":"M15","parse":"Sibyl 理解\ns1. a\ns2.\ns3. c","expect":null}
+{"id":"U1","start":"/sibyl 做个船","action":"offer","phase":"draft","incl":"做个船"}
+{"id":"U2","start":"   /SIBYL\n做艘船\n只需模型","action":"offer","phase":"draft","incl":"做艘船\n只需模型"}
+{"id":"U3","start":"/sibyl","action":"notice"}
+{"id":"U4","start":"/sibylize anything","action":"pass"}
+{"id":"U5","start":"解释 /sibyl 做什么","action":"pass"}
+{"id":"U6","start":"s2","action":"pass"}
+{"id":"U7","start":"/predict on act","action":"pass"}
+{"id":"R1","ready":"s2","action":"select","label":"s2","extra":""}
+{"id":"R2","ready":"S2，改成黄昏，不要尾流","action":"select","label":"s2","extra":"改成黄昏，不要尾流"}
+{"id":"R3","ready":"换一组，更写实","action":"offer","phase":"draft","incl":"更写实"}
+{"id":"R4","ready":"regenerate","action":"offer","phase":"draft"}
+{"id":"R5","ready":"取消","action":"notice"}
+{"id":"R6","ready":"2","action":"pass"}
+{"id":"R7","ready":"s3cret","action":"pass"}
+{"id":"R8","ready":"s8","action":"notice","phase":"ready"}
+{"id":"R9","ready":"/sibyl 另一个任务","action":"offer","phase":"draft","incl":"另一个任务"}
+{"id":"R10","ready":"s1，把拖轮换成红色","journal":false,"action":"select","noRecord":true}
+{"id":"R11","ready":"/predict status","action":"pass"}
+{"id":"R12","ready":"换个话题","action":"pass"}

@@ -164,6 +164,7 @@ export function recordReply({ state, prompt, now, session = null, agent = null, 
   if (!journal || now - state.last.at > LAST_TTL_MS) return { record: null, save: true, state: next };
   const text = String(prompt ?? '');
   const record = {
+    layer: 'predict',
     at: now,
     session,
     agent,
@@ -208,9 +209,15 @@ export function appendLearned(reason, learned) {
 
 const hit = (r, label) => (r.reply.kind === 'pick' || r.reply.kind === 'pick_plus') && (!label || r.reply.label === label);
 
+/** Read the prediction journal, including entries written before layer tags existed. */
+export function asPredictionRecord(record) {
+  if (!record || (record.layer !== undefined && record.layer !== 'predict') || !Array.isArray(record.suggestions) || !record.reply) return null;
+  return record.layer === 'predict' ? record : { ...record, layer: 'predict' };
+}
+
 /** Statistics over journal records (evolve/SPEC.md §7). */
 export function stats(records) {
-  const usable = (records ?? []).filter((r) => r && Array.isArray(r.suggestions) && r.suggestions.length && r.reply);
+  const usable = (records ?? []).map(asPredictionRecord).filter(r => r?.suggestions.length);
   const count = (kind) => usable.filter((r) => r.reply.kind === kind).length;
   const bins = [0, 1, 2, 3, 4].map((i) => ({ from: i / 5, to: (i + 1) / 5, n: 0, stated: 0, picked: 0 }));
   let brierSum = 0;

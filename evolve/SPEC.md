@@ -91,7 +91,7 @@ It appends the returned record, if any, to `journal.jsonl`, and saves the state 
 A record:
 
 ```json
-{"at": 1800000000000, "session": "…", "agent": "grok", "project": "3f2a9c01b7de", "predictedAt": 1799999940000,
+{"layer": "predict", "at": 1800000000000, "session": "…", "agent": "grok", "project": "3f2a9c01b7de", "predictedAt": 1799999940000,
  "context": "the last 300 characters the agent wrote before its Sibyl block",
  "suggestions": [{"label": "s1", "text": "跑一下测试", "confidence": 0.6}],
  "reply": {"kind": "pick_plus", "label": "s1", "extra": "顺便加上日志", "text": "s1 顺便加上日志"},
@@ -108,6 +108,8 @@ A record:
 | `other` | said something else |
 
 **The user's message is recorded as written**, cut at 2000 characters. Records stay on the machine. `journal: false` stops recording, and `/predict forget` deletes everything recorded (§7).
+
+New prediction entries carry `layer: "predict"`. `asPredictionRecord` reads older records from this journal as predictions and ignores explicitly different layers. Statistics, learning and forgetting use only this journal and its associated files. When understanding is installed, route its commands and selections before calling `recordReply`.
 
 The integration SHOULD keep at most `journal_max` records, dropping the oldest.
 

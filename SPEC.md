@@ -342,6 +342,7 @@ A module extends an installation without changing this specification or the refe
 | Module | Specification | What it adds |
 |---|---|---|
 | Evolution | [evolve/SPEC.md](evolve/SPEC.md) | A local journal of the user's replies to predictions, statistics, and learning turns whose notes accompany later predictions |
+| Understanding | [understand/SPEC.md](understand/SPEC.md) | The explicit `/sibyl <request>` command expands one request into three prompts before work starts. Selection history is stored separately from predictions. |
 
 ## 12. The shared home
 
